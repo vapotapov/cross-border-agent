@@ -18,13 +18,13 @@ def normalize_segments(raw_segments: SegmentList) -> SegmentList:
     for seg in raw_segments:
         # NOTE: in real code parse timestamps properly and compute duration.
         norm = {
-            "provider": seg["provider"],
-            "from": seg["from"],
-            "to": seg["to"],
-            "dep": seg["dep"],
-            "arr": seg["arr"],
-            "mode": seg["mode"],
-            "price_eur": float(seg["price_eur"]),
+            "provider": seg.get("provider", "unknown"),
+            "from": seg.get("from", ""),
+            "to": seg.get("to", ""),
+            "dep": seg.get("dep", ""),
+            "arr": seg.get("arr", ""),
+            "mode": seg.get("mode", "unknown"),
+            "price_eur": float(seg.get("price_eur", 0.0)),
             "transfers": int(seg.get("transfers", 0)),
             "currency": seg.get("currency", "EUR"),
             # toy heuristics
@@ -44,7 +44,7 @@ def build_candidate_routes(
 
     total_price = sum(seg["price_eur"] for seg in segments)
     total_transfers = sum(seg["transfers"] for seg in segments)
-    total_duration = sum(seg["duration_hours"] for seg in segments)
+    total_duration = sum(seg.get("duration_hours", 0.0) for seg in segments)
 
     return [
         {
@@ -64,9 +64,18 @@ def score_routes(routes: RouteList) -> Dict[str, Any]:
     if not routes:
         return {"fastest": None, "cheapest": None, "fewest_transfers": None}
 
-    fastest = min(routes, key=lambda r: r["total_duration_hours"])
-    cheapest = min(routes, key=lambda r: r["total_price_eur"])
-    fewest_transfers = min(routes, key=lambda r: r["total_transfers"])
+    # Filter out malformed routes to avoid KeyError.
+    valid_routes = [
+        r
+        for r in routes
+        if {"total_duration_hours", "total_price_eur", "total_transfers"}.issubset(r.keys())
+    ]
+    if not valid_routes:
+        return {"fastest": None, "cheapest": None, "fewest_transfers": None}
+
+    fastest = min(valid_routes, key=lambda r: r.get("total_duration_hours", float("inf")))
+    cheapest = min(valid_routes, key=lambda r: r.get("total_price_eur", float("inf")))
+    fewest_transfers = min(valid_routes, key=lambda r: r.get("total_transfers", float("inf")))
 
     return {
         "fastest": fastest,

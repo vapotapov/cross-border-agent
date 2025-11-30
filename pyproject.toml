@@ -25,6 +25,10 @@ dev = [
 addopts = "-q"
 pythonpath = ["src"]
 
+[project.scripts]
+cross-border-agent = "src.runner:run_demo"
+cross-border-agent-once = "src.runner:run_once"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 
