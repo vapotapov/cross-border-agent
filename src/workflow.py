@@ -15,14 +15,8 @@ from src.providers import (
 )
 from src.routing import build_routes_tool, normalize_segments_tool, score_routes_tool
 
-GEMINI_MODEL = "gemini-2.5-flash-lite"
 
-retry_config=types.HttpRetryOptions(
-    attempts=5,  # Maximum retry attempts
-    exp_base=7,  # Delay multiplier
-    initial_delay=1,
-    http_status_codes=[429, 500, 503, 504], # Retry on these HTTP errors
-)
+GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 # --- Search agents (run in parallel) ---------------------------------
 
@@ -30,7 +24,6 @@ retry_config=types.HttpRetryOptions(
 rail_search_agent = LlmAgent(
     name="RailSearchAgent",
     model=GEMINI_MODEL,
-    retry_options=retry_config,
     description=(
         "Searches DB, PKP, and UZ for rail segments between origin and "
         "destination."
@@ -51,7 +44,6 @@ rail_search_agent = LlmAgent(
 flight_search_agent = LlmAgent(
     name="FlightSearchAgent",
     model=GEMINI_MODEL,
-    retry_options=retry_config,
     description=(
         "Searches flights from origin to regional hubs "
         "(e.g., Bucharest, Chisinau)."
@@ -69,7 +61,6 @@ flight_search_agent = LlmAgent(
 bus_search_agent = LlmAgent(
     name="BusSearchAgent",
     model=GEMINI_MODEL,
-    retry_options=retry_config,
     description=(
         "Searches cross-border buses from hubs into target country."
     ),
@@ -177,7 +168,7 @@ advisor_agent = LlmAgent(
         "    * cheapest route\n"
         "    * route with fewest transfers\n"
         "  including total time, price, and number of transfers.\n"
-        "- If {border_notes} are available, append a short warning/safety "
+        "- If border_notes are available in state, append a short warning/safety "
         "paragraph.\n"
         "- Output should be clear, bullet-pointed, and human-readable."
     ),

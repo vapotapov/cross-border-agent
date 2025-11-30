@@ -3,16 +3,34 @@
 from __future__ import annotations
 
 import asyncio
+import os
+from pathlib import Path
 from typing import Final
 
+from dotenv import load_dotenv
 from google.adk.runners import InMemoryRunner
 from google.genai import types
+
+# Load environment variables early so Google ADK sees API credentials.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")  # project root .env if present
+load_dotenv(Path(__file__).with_name(".env"))  # src/.env fallback
 
 from src.workflow import root_agent
 
 DEFAULT_APP: Final[str] = "cross-border-agent"
 DEFAULT_USER: Final[str] = "demo-user-1"
 DEFAULT_SESSION: Final[str] = "session-1"
+REQUIRED_ENV_VARS: Final[tuple[str, ...]] = ("GOOGLE_API_KEY",)
+
+
+def _ensure_credentials() -> None:
+    """Raise a clear error if required credentials are missing."""
+    missing = [key for key in REQUIRED_ENV_VARS if not os.getenv(key)]
+    if missing:
+        raise RuntimeError(
+            f"Missing required environment variables: {', '.join(missing)}. "
+            "Set them in .env or your shell before running."
+        )
 
 
 async def run_once(
@@ -26,6 +44,8 @@ async def run_once(
     session_id: str = DEFAULT_SESSION,
 ) -> None:
     """Run the workflow a single time with the given parameters."""
+    _ensure_credentials()
+
     runner = InMemoryRunner(agent=root_agent, app_name=app_name)
     session_service = runner.session_service
 
