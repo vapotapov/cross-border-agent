@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from google.adk.agents import LlmAgent, ParallelAgent, SequentialAgent
 from google.adk.tools import AgentTool, google_search
+from google.genai import types
 
 from src.providers import (
     search_buses_tool,
@@ -16,17 +17,30 @@ from src.routing import build_routes_tool, normalize_segments_tool, score_routes
 
 GEMINI_MODEL = "gemini-2.5-flash-lite"
 
+retry_config=types.HttpRetryOptions(
+    attempts=5,  # Maximum retry attempts
+    exp_base=7,  # Delay multiplier
+    initial_delay=1,
+    http_status_codes=[429, 500, 503, 504], # Retry on these HTTP errors
+)
+
 # --- Search agents (run in parallel) ---------------------------------
 
 
 rail_search_agent = LlmAgent(
     name="RailSearchAgent",
     model=GEMINI_MODEL,
-    description="Searches DB, PKP, and UZ for rail segments between origin and destination.",
+    retry_options=retry_config,
+    description=(
+        "Searches DB, PKP, and UZ for rail segments between origin and "
+        "destination."
+    ),
     instruction=(
         "You are a rail search specialist.\n"
-        "- Use the DB, PKP, and UZ tools to fetch rail segments for the trip.\n"
-        "- Always request segments using the provided origin, destination, and date.\n"
+        "- Use the search_db_tool, search_pkp_tool, and search_uz_tool tools to fetch rail segments for the "
+        "trip.\n"
+        "- Always request segments using the provided origin, destination, "
+        "and date.\n"
         "- Merge all segments into a single list.\n"
         "- Return ONLY JSON with key 'rail_segments', no extra text."
     ),
@@ -37,10 +51,15 @@ rail_search_agent = LlmAgent(
 flight_search_agent = LlmAgent(
     name="FlightSearchAgent",
     model=GEMINI_MODEL,
-    description="Searches flights from origin to regional hubs (e.g., Bucharest, Chisinau).",
+    retry_options=retry_config,
+    description=(
+        "Searches flights from origin to regional hubs "
+        "(e.g., Bucharest, Chisinau)."
+    ),
     instruction=(
         "You are a flight search specialist.\n"
-        "- Use the flights tool to get flight segments from origin to nearby hubs.\n"
+        "- Use search_flights_tool to get flight segments from origin to nearby "
+        "hubs.\n"
         "- Return ONLY JSON with key 'flight_segments'."
     ),
     tools=[search_flights_tool],
@@ -50,10 +69,14 @@ flight_search_agent = LlmAgent(
 bus_search_agent = LlmAgent(
     name="BusSearchAgent",
     model=GEMINI_MODEL,
-    description="Searches cross-border buses from hubs into target country.",
+    retry_options=retry_config,
+    description=(
+        "Searches cross-border buses from hubs into target country."
+    ),
     instruction=(
         "You are a long-distance bus search specialist.\n"
-        "- Use the buses tool to get bus segments that connect hubs to the destination region.\n"
+        "- Use the search_buses_tool to get bus segments that connect hubs to the "
+        "destination region.\n"
         "- Return ONLY JSON with key 'bus_segments'."
     ),
     tools=[search_buses_tool],
@@ -71,10 +94,12 @@ search_parallel_agent = ParallelAgent(
 normalization_agent = LlmAgent(
     name="NormalizationAgent",
     model=GEMINI_MODEL,
-    description="Normalizes raw segments from multiple providers into a unified schema.",
+    description=(
+        "Normalizes raw segments from multiple providers into a unified schema."
+    ),
     instruction=(
         "You are a normalization engine.\n"
-        "- Read raw segments from state keys: rail_segments, flight_segments, bus_segments.\n"
+        "- Read raw segments from state keys: {rail_segments}, {flight_segments}, {bus_segments}.\n"
         "- Combine them into a single Python list.\n"
         "- Call the 'normalize_segments' tool once with that list.\n"
         "- Return ONLY JSON with key 'normalized_segments'.\n"
@@ -90,9 +115,11 @@ connection_builder_agent = LlmAgent(
     description="Builds feasible candidate routes from normalized segments.",
     instruction=(
         "You are a connection builder.\n"
-        "- Read 'normalized_segments' from session state.\n"
-        "- Use the 'build_candidate_routes' tool to construct feasible routes from origin to destination using that list.\n"
-        "- Use the origin and destination from the user message or state keys 'origin' and 'destination' if present.\n"
+        "- Read {normalized_segments} from session state.\n"
+        "- Use the build_routes_tool to construct feasible routes "
+        "from origin to destination using that list.\n"
+        "- Use the origin and destination from the user message or state keys "
+        "'origin' and 'destination' if present.\n"
         "- Return ONLY JSON with key 'candidate_routes'."
     ),
     tools=[build_routes_tool],
@@ -108,8 +135,9 @@ optimization_agent = LlmAgent(
     description="Scores candidate routes for fastest, cheapest, and fewest transfers.",
     instruction=(
         "You are a routing optimizer.\n"
-        "- Read 'candidate_routes' from session state.\n"
-        "- Use the 'score_routes' tool to compute the fastest, cheapest, and fewest transfers routes.\n"
+        "- Read {candidate_routes} from session state.\n"
+        "- Use the score_routes_tool to compute the fastest, cheapest, and "
+        "fewest transfers routes.\n"
         "- Return ONLY JSON with keys: 'fastest', 'cheapest', 'fewest_transfers'."
     ),
     tools=[score_routes_tool],
@@ -125,7 +153,8 @@ border_info_agent = LlmAgent(
     description="Looks up current border status, disruptions, or safety advisories along the route.",
     instruction=(
         "You are a border and disruption information specialist.\n"
-        "Use Google Search to check for recent news on border closures, strikes, or war-related disruptions that might affect the suggested route.\n"
+        "Use google_search to check for recent news on border closures, "
+        "strikes, or war-related disruptions that might affect the suggested route.\n"
         "Summarize only the most critical points briefly."
     ),
     tools=[google_search],
@@ -137,12 +166,19 @@ border_info_tool = AgentTool(agent=border_info_agent)
 advisor_agent = LlmAgent(
     name="AdvisorAgent",
     model=GEMINI_MODEL,
-    description="Turns raw scores + border info into a user-friendly itinerary summary.",
+    description=(
+        "Turns raw scores + border info into a user-friendly itinerary summary."
+    ),
     instruction=(
         "You are a travel advisor.\n"
-        "- Read 'ranked_routes' from state and optionally call the border_info agent tool.\n"
-        "- Generate a concise explanation of: fastest route, cheapest route, fewest transfers route, including total time, price, and number of transfers.\n"
-        "- If border_notes are available, append a short warning/safety paragraph.\n"
+        "- Read {ranked_routes} from state.\n"
+        "- Generate a concise explanation of:\n"
+        "    * fastest route\n"
+        "    * cheapest route\n"
+        "    * route with fewest transfers\n"
+        "  including total time, price, and number of transfers.\n"
+        "- If {border_notes} are available, append a short warning/safety "
+        "paragraph.\n"
         "- Output should be clear, bullet-pointed, and human-readable."
     ),
     tools=[border_info_tool],
