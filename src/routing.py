@@ -36,28 +36,28 @@ def normalize_segments(raw_segments: SegmentList) -> SegmentList:
 
 
 def build_candidate_routes(
-    segments: SegmentList, origin: str, destination: str
+    raw_segments: SegmentList, origin: str, destination: str
 ) -> RouteList:
-    """Treat the full list of segments as a single linear route (demo)."""
+    """Build route candidates from raw provider segments."""
+
+    segments = normalize_segments(raw_segments)  # <-- automatic normalization
+
     if not segments:
         return []
 
     total_price = sum(seg["price_eur"] for seg in segments)
     total_transfers = sum(seg["transfers"] for seg in segments)
-    total_duration = sum(seg.get("duration_hours", 0.0) for seg in segments)
+    total_duration = sum(seg["duration_hours"] for seg in segments)
 
-    return [
-        {
-            "id": "route_1",
-            "origin": origin,
-            "destination": destination,
-            "segments": segments,
-            "total_price_eur": round(total_price, 2),
-            "total_transfers": total_transfers,
-            "total_duration_hours": total_duration,
-        }
-    ]
-
+    return [{
+        "id": "route_1",
+        "origin": origin,
+        "destination": destination,
+        "segments": segments,
+        "total_price_eur": round(total_price, 2),
+        "total_transfers": total_transfers,
+        "total_duration_hours": total_duration,
+    }]
 
 def score_routes(routes: RouteList) -> Dict[str, Any]:
     """Score candidate routes on fastest / cheapest / fewest transfers."""

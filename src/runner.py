@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Final
 
 from dotenv import load_dotenv
-from google.adk.runners import InMemoryRunner
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
 # Load environment variables early so Google ADK sees API credentials.
@@ -31,8 +32,12 @@ async def run_once(
     session_id: str = DEFAULT_SESSION,
 ) -> None:
     """Run the workflow a single time with the given parameters."""
-    runner = InMemoryRunner(agent=root_agent, app_name=app_name)
-    session_service = runner.session_service
+    session_service = InMemorySessionService()
+    runner = Runner(
+        agent=root_agent,
+        app_name=app_name,
+        session_service=session_service,
+    )
 
     await session_service.create_session(
         app_name=app_name,

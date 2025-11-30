@@ -25,7 +25,6 @@ def search_db_trains(origin: str, destination: str, date: str) -> SegmentList:
         },
     ]
 
-
 def search_pkp_trains(origin: str, destination: str, date: str) -> SegmentList:
     """Mock PKP (Poland) search."""
     return [
@@ -41,7 +40,6 @@ def search_pkp_trains(origin: str, destination: str, date: str) -> SegmentList:
             "transfers": 0,
         },
     ]
-
 
 def search_uz_trains(origin: str, destination: str, date: str) -> SegmentList:
     """Mock Ukrzaliznytsia search."""

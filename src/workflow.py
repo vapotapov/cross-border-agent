@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from google.adk.agents import LlmAgent, ParallelAgent, SequentialAgent
+from google.adk.models.google_llm import Gemini
 from google.adk.tools import AgentTool, google_search
 from google.genai import types
 
@@ -16,10 +17,16 @@ from src.providers import (
 from src.routing import build_routes_tool, normalize_segments_tool, score_routes_tool
 
 
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+RETRY_OPTIONS = types.HttpRetryOptions(
+    attempts=5,
+    exp_base=7,
+    initial_delay=1,
+    http_status_codes=[429, 500, 502, 503, 504],
+)
+
+GEMINI_MODEL = Gemini(model="gemini-2.5-flash-lite", retry_options=RETRY_OPTIONS)
 
 # --- Search agents (run in parallel) ---------------------------------
-
 rail_search_agent = LlmAgent(
     name="RailSearchAgent",
     model=GEMINI_MODEL,
@@ -34,7 +41,11 @@ rail_search_agent = LlmAgent(
         "- Always request segments using the provided origin, destination, "
         "and date.\n"
         "- Merge all segments into a single list.\n"
-        "- Return ONLY JSON with key 'rail_segments', no extra text."
+        "- Return ONLY valid JSON, no explanation, no prose.\n"
+        "Format:\n"
+        "{\n"
+        "  \"rail_segments\": [...]\n"
+        "}\n"
     ),
     tools=[search_db_tool, search_pkp_tool, search_uz_tool],
     output_key="rail_segments",
@@ -51,7 +62,11 @@ flight_search_agent = LlmAgent(
         "You are a flight search specialist.\n"
         "- Use search_flights_tool to get flight segments from origin to nearby "
         "hubs.\n"
-        "- Return ONLY JSON with key 'flight_segments'."
+        "- Return ONLY valid JSON, no explanation, no prose.\n"
+        "Format:\n"
+        "{\n"
+        "  \"flight_segments\": [...]\n"
+        "}\n"
     ),
     tools=[search_flights_tool],
     output_key="flight_segments",
@@ -67,7 +82,11 @@ bus_search_agent = LlmAgent(
         "You are a long-distance bus search specialist.\n"
         "- Use the search_buses_tool to get bus segments that connect hubs to the "
         "destination region.\n"
-        "- Return ONLY JSON with key 'bus_segments'."
+        "- Return ONLY valid JSON, no explanation, no prose.\n"
+        "Format:\n"
+        "{\n"
+        "  \"bus_segments\": [...]\n"
+        "}\n"
     ),
     tools=[search_buses_tool],
     output_key="bus_segments",
@@ -78,9 +97,19 @@ search_parallel_agent = ParallelAgent(
     sub_agents=[rail_search_agent, flight_search_agent, bus_search_agent],
 )
 
+# --- Pre-Normalize
+ensure_defaults_agent = LlmAgent(
+    name="EnsureDefaults",
+    model=GEMINI_MODEL,
+    instruction=(
+        "Ensure these keys exist in the session state:\n"
+        "{{rail_segments}}, {{flight_segments}}, {{bus_segments}}.\n"
+        "If any is missing, set it to an empty list instead.\n"
+    ),
+    output_key=None,
+)
+
 # --- Normalization + connection builder ------------------------------
-
-
 normalization_agent = LlmAgent(
     name="NormalizationAgent",
     model=GEMINI_MODEL,
@@ -89,11 +118,15 @@ normalization_agent = LlmAgent(
     ),
     instruction=(
         "You are a normalization engine.\n"
-        "- Read raw segments from state keys: {rail_segments}, {flight_segments}, {bus_segments}.\n"
+        "- Read raw segments from state keys: {{rail_segments}}, {{flight_segments}}, {{bus_segments}}.\n"
         "- Combine them into a single Python list.\n"
         "- Call the 'normalize_segments' tool once with that list.\n"
-        "- Return ONLY JSON with key normalized_segments.\n"
-        "If there are no segments, return 'normalized_segments: []'}'."
+        "- Return ONLY valid JSON, no explanation, no prose.\n"
+        "Format:\n"
+        "{\n"
+        "  \"normalized_segments\": [...]\n"
+        "}\n"
+        "If there are no segments, return 'normalized_segments: []'."
     ),
     tools=[normalize_segments_tool],
     output_key="normalized_segments",
@@ -105,12 +138,16 @@ connection_builder_agent = LlmAgent(
     description="Builds feasible candidate routes from normalized segments.",
     instruction=(
         "You are a connection builder.\n"
-        "- Read {normalized_segments} from session state.\n"
+        "- Read {{normalized_segments}} from session state.\n"
         "- Use the build_routes_tool to construct feasible routes "
         "from origin to destination using that list.\n"
         "- Use the origin and destination from the user message or state keys "
         "'origin' and 'destination' if present.\n"
-        "- Return ONLY JSON with key 'candidate_routes'."
+        "- Return ONLY valid JSON, no explanation, no prose.\n"
+        "Format:\n"
+        "{\n"
+        "  \"candidate_routes\": [...]\n"
+        "}\n"
     ),
     tools=[build_routes_tool],
     output_key="candidate_routes",
@@ -125,10 +162,14 @@ optimization_agent = LlmAgent(
     description="Scores candidate routes for fastest, cheapest, and fewest transfers.",
     instruction=(
         "You are a routing optimizer.\n"
-        "- Read {candidate_routes} from session state.\n"
+        "- Read {{candidate_routes}} from session state.\n"
         "- Use the score_routes_tool to compute the fastest, cheapest, and "
         "fewest transfers routes.\n"
-        "- Return ONLY JSON with keys: 'fastest', 'cheapest', 'fewest_transfers'."
+        "- Return ONLY valid JSON with keys: 'fastest', 'cheapest', 'fewest_transfers', no explanation, no prose.\n"
+        "Format:\n"
+        "{\n"
+        "  \"ranked_routes\": [...]\n"
+        "}\n"
     ),
     tools=[score_routes_tool],
     output_key="ranked_routes",
@@ -142,7 +183,7 @@ advisor_agent = LlmAgent(
     ),
     instruction=(
         "You are a travel advisor.\n"
-        "- Read {ranked_routes} from state.\n"
+        "- Read {{ranked_routes}} from state.\n"
         "- Generate a concise explanation of:\n"
         "    * fastest route\n"
         "    * cheapest route\n"
@@ -159,6 +200,7 @@ root_agent = SequentialAgent(
     name="MultiModalTravelPlanner",
     sub_agents=[
         search_parallel_agent,
+        ensure_defaults_agent,
         normalization_agent,
         connection_builder_agent,
         optimization_agent,
