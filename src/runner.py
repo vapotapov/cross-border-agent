@@ -1,27 +1,31 @@
 """Local runner helper for manual testing."""
 
-from dotenv import load_dotenv
-load_dotenv()
+from __future__ import annotations
 
 import asyncio
+from typing import Final
 
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
-from .workflow import root_agent
+from src.workflow import root_agent
+
+DEFAULT_APP: Final[str] = "cross-border-agent"
+DEFAULT_USER: Final[str] = "demo-user-1"
+DEFAULT_SESSION: Final[str] = "session-1"
 
 
-async def _run_once(
+async def run_once(
     query: str,
     origin: str = "Berlin",
     destination: str = "Pischanka",
     date: str = "2025-12-15",
+    *,
+    app_name: str = DEFAULT_APP,
+    user_id: str = DEFAULT_USER,
+    session_id: str = DEFAULT_SESSION,
 ) -> None:
-    """Simple helper to run the pipeline locally with InMemoryRunner."""
-    app_name = "multi_agent_travel"
-    user_id = "demo-user-1"
-    session_id = "session-1"
-
+    """Run the workflow a single time with the given parameters."""
     runner = InMemoryRunner(agent=root_agent, app_name=app_name)
     session_service = runner.session_service
 
@@ -32,7 +36,9 @@ async def _run_once(
     )
 
     session = await session_service.get_session(
-        app_name=app_name, user_id=user_id, session_id=session_id
+        app_name=app_name,
+        user_id=user_id,
+        session_id=session_id,
     )
     session.state["origin"] = origin
     session.state["destination"] = destination
@@ -47,8 +53,7 @@ async def _run_once(
                     f"Origin: {origin}\n"
                     f"Destination: {destination}\n"
                     f"Date: {date}\n"
-                    "Return the recommended routes as described in your "
-                    "instructions."
+                    "Return the recommended routes as described in your instructions."
                 )
             )
         ],
@@ -69,7 +74,7 @@ async def _run_once(
 
 async def run_demo() -> None:
     """Convenience wrapper that runs a sample request."""
-    await _run_once(
+    await run_once(
         query="Find me the fastest, cheapest, and fewest-transfer routes.",
         origin="Berlin",
         destination="Pischanka",
@@ -77,7 +82,7 @@ async def run_demo() -> None:
     )
 
 
-__all__ = ["_run_once", "run_demo"]
+__all__ = ["run_once", "run_demo"]
 
 
 if __name__ == "__main__":

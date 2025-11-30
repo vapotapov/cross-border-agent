@@ -1,24 +1,16 @@
 """Mock provider search functions and FunctionTool wrappers."""
 
+from __future__ import annotations
+
 from typing import Any, Dict, List
 
 from google.adk.tools import FunctionTool
 
+SegmentList = List[Dict[str, Any]]
 
-def search_db_trains(
-    origin: str, destination: str, date: str
-) -> List[Dict[str, Any]]:
-    """
-    Mock Deutsche Bahn search.
 
-    Args:
-        origin: Origin city or station (e.g. 'Berlin').
-        destination: Destination city or station (e.g. 'Warsaw').
-        date: Travel date in ISO format YYYY-MM-DD.
-
-    Returns:
-        List of segment dicts in a provider-native format.
-    """
+def search_db_trains(origin: str, destination: str, date: str) -> SegmentList:
+    """Mock Deutsche Bahn search."""
     return [
         {
             "provider": "DB",
@@ -30,13 +22,11 @@ def search_db_trains(
             "price_eur": 29.0,
             "currency": "EUR",
             "transfers": 0,
-        }
+        },
     ]
 
 
-def search_pkp_trains(
-    origin: str, destination: str, date: str
-) -> List[Dict[str, Any]]:
+def search_pkp_trains(origin: str, destination: str, date: str) -> SegmentList:
     """Mock PKP (Poland) search."""
     return [
         {
@@ -49,13 +39,11 @@ def search_pkp_trains(
             "price_eur": 40.0,
             "currency": "EUR",
             "transfers": 0,
-        }
+        },
     ]
 
 
-def search_uz_trains(
-    origin: str, destination: str, date: str
-) -> List[Dict[str, Any]]:
+def search_uz_trains(origin: str, destination: str, date: str) -> SegmentList:
     """Mock Ukrzaliznytsia search."""
     return [
         {
@@ -68,13 +56,11 @@ def search_uz_trains(
             "price_eur": 45.0,
             "currency": "EUR",
             "transfers": 1,
-        }
+        },
     ]
 
 
-def search_flights_to_hubs(
-    origin: str, date: str
-) -> List[Dict[str, Any]]:
+def search_flights_to_hubs(origin: str, date: str) -> SegmentList:
     """Mock flights to regional hubs (e.g. Bucharest / Chisinau)."""
     return [
         {
@@ -98,13 +84,13 @@ def search_flights_to_hubs(
             "price_eur": 110.0,
             "currency": "EUR",
             "transfers": 0,
-        },
+        }
     ]
 
 
 def search_cross_border_buses(
     origin: str, destination: str, date: str
-) -> List[Dict[str, Any]]:
+) -> SegmentList:
     """Mock long-distance / cross-border buses."""
     return [
         {
@@ -117,7 +103,7 @@ def search_cross_border_buses(
             "price_eur": 60.0,
             "currency": "EUR",
             "transfers": 0,
-        }
+        },
     ]
 
 

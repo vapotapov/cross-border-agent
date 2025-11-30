@@ -1,15 +1,14 @@
-"""Public entry point for the travel planner."""
+"""Convenience entry points for the travel planner."""
 
-from dotenv import load_dotenv
-load_dotenv()
+from __future__ import annotations
 
-from .runner import _run_once, run_demo
-from .workflow import root_agent
+import asyncio
 
-__all__ = ["root_agent", "_run_once", "run_demo"]
+from src import root_agent
+from src.runner import run_demo, run_once
+
+__all__ = ["root_agent", "run_demo", "run_once"]
 
 
 if __name__ == "__main__":
-    import asyncio
-
     asyncio.run(run_demo())
