@@ -20,7 +20,6 @@ GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 # --- Search agents (run in parallel) ---------------------------------
 
-
 rail_search_agent = LlmAgent(
     name="RailSearchAgent",
     model=GEMINI_MODEL,
@@ -90,7 +89,7 @@ normalization_agent = LlmAgent(
     ),
     instruction=(
         "You are a normalization engine.\n"
-        "- Read raw segments from state keys: {rail_segments}, {flight_segments}, {bus_segments}.\n"
+        "- Read raw segments from state keys: rail_segments, flight_segments, bus_segments.\n"
         "- Combine them into a single Python list.\n"
         "- Call the 'normalize_segments' tool once with that list.\n"
         "- Return ONLY JSON with key 'normalized_segments'.\n"
@@ -106,7 +105,7 @@ connection_builder_agent = LlmAgent(
     description="Builds feasible candidate routes from normalized segments.",
     instruction=(
         "You are a connection builder.\n"
-        "- Read {normalized_segments} from session state.\n"
+        "- Read normalized_segments from session state.\n"
         "- Use the build_routes_tool to construct feasible routes "
         "from origin to destination using that list.\n"
         "- Use the origin and destination from the user message or state keys "
@@ -126,7 +125,7 @@ optimization_agent = LlmAgent(
     description="Scores candidate routes for fastest, cheapest, and fewest transfers.",
     instruction=(
         "You are a routing optimizer.\n"
-        "- Read {candidate_routes} from session state.\n"
+        "- Read candidate_routes from session state.\n"
         "- Use the score_routes_tool to compute the fastest, cheapest, and "
         "fewest transfers routes.\n"
         "- Return ONLY JSON with keys: 'fastest', 'cheapest', 'fewest_transfers'."
