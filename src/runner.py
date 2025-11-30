@@ -48,6 +48,18 @@ async def run_once(
     session.state["origin"] = origin
     session.state["destination"] = destination
     session.state["date"] = date
+    # Seed expected state keys so instruction templating doesn't fail if upstream tools return nothing.
+    session_defaults = {
+        "rail_segments": [],
+        "flight_segments": [],
+        "bus_segments": [],
+        "normalized_segments": [],
+        "candidate_routes": [],
+        "ranked_routes": {},
+        "border_notes": "",
+    }
+    for key, value in session_defaults.items():
+        session.state.setdefault(key, value)
 
     user_content = types.Content(
         role="user",
